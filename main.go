@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os")
+	"os"
+	"github.com/joho/godotenv"
+)
 
-//Structure to represent a CSV line
+// Structure to represent a CSV line
 type CSVRow struct {
 	ISO         string `json:"ISO"`
 	Country     string `json:"Country"`
@@ -20,7 +22,7 @@ type CSVRow struct {
 func searchCSV(filename string, searchColumn string, searchValue string) []CSVRow {
 	var result []CSVRow
 
-	// Function for CSV search
+	// Open the CSV file for reading
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatal(err)
@@ -36,7 +38,7 @@ func searchCSV(filename string, searchColumn string, searchValue string) []CSVRo
 		log.Fatal(err)
 	}
 
-// Map the CSV rows to the CSVRow structure
+	// Map the CSV rows to the CSVRow structure
 	for _, line := range lines {
 		row := CSVRow{
 			ISO:         line[0],
@@ -60,6 +62,18 @@ func searchCSV(filename string, searchColumn string, searchValue string) []CSVRo
 }
 
 func main() {
+	// Load environment variables from .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+
+	// Get the PORT variable from environment
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8000" // Default port if PORT is not defined in .env
+	}
+
 	http.HandleFunc("/search_csv", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -77,7 +91,7 @@ func main() {
 		searchValue := requestBody["search_value"]
 
 		// Perform the search in the CSV file
-		filename := "./datas.csv" 
+		filename := "./datas.csv"
 		searchResult := searchCSV(filename, searchColumn, searchValue)
 
 		// Return results as JSON
@@ -88,6 +102,6 @@ func main() {
 		}
 	})
 
-	fmt.Println("Server running on port 8001...")
-	http.ListenAndServe(":8001", nil)
+	fmt.Printf("Server running on port %s...\n", port)
+	http.ListenAndServe(":"+port, nil)
 }
