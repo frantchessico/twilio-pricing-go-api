@@ -61,6 +61,38 @@ func searchCSV(filename string, searchColumn string, searchValue string) []CSVRo
 	return result
 }
 
+func getCountries(filename string) []string {
+	var countries []string
+
+	// Open the CSV file for reading
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	// Create a CSV reader
+	reader := csv.NewReader(file)
+
+	// Read all lines from the CSV
+	lines, err := reader.ReadAll()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Extract unique country names from CSV
+	seen := make(map[string]bool)
+	for _, line := range lines {
+		country := line[1]
+		if !seen[country] {
+			countries = append(countries, country)
+			seen[country] = true
+		}
+	}
+
+	return countries
+}
+
 func main() {
 	// Load environment variables from .env file
 	err := godotenv.Load()
@@ -97,6 +129,24 @@ func main() {
 		// Return results as JSON
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(searchResult); err != nil {
+			http.Error(w, "Error encoding response", http.StatusInternalServerError)
+			return
+		}
+	})
+
+	http.HandleFunc("/countries", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Get the list of unique countries
+		filename := "./datas.csv"
+		countryList := getCountries(filename)
+
+		// Return country list as JSON
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(countryList); err != nil {
 			http.Error(w, "Error encoding response", http.StatusInternalServerError)
 			return
 		}
