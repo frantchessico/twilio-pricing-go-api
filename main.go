@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/csv"
-	"encoding/json"
+	// "encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
+    "github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 )
 
@@ -100,24 +101,20 @@ func main() {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
-	// Get the PORT variable from environment
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8000" // Default port if PORT is not defined in .env
-	}
+	// Create a Fiber app
+	app := fiber.New()
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+	}))
 
-	http.HandleFunc("/search_csv", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
+	// Define routes
+	app.Post("/search_csv", func(c *fiber.Ctx) error {
 		// Parse the JSON request body
 		var requestBody map[string]string
-		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&requestBody); err != nil {
-			http.Error(w, "Error parsing request body", http.StatusBadRequest)
-			return
+		if err := c.BodyParser(&requestBody); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Error parsing request body",
+			})
 		}
 		searchColumn := requestBody["search_column"]
 		searchValue := requestBody["search_value"]
@@ -127,31 +124,25 @@ func main() {
 		searchResult := searchCSV(filename, searchColumn, searchValue)
 
 		// Return results as JSON
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(searchResult); err != nil {
-			http.Error(w, "Error encoding response", http.StatusInternalServerError)
-			return
-		}
+		return c.JSON(searchResult)
 	})
 
-	http.HandleFunc("/countries", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
+	app.Get("/countries", func(c *fiber.Ctx) error {
 		// Get the list of unique countries
 		filename := "./datas.csv"
 		countryList := getCountries(filename)
 
 		// Return country list as JSON
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(countryList); err != nil {
-			http.Error(w, "Error encoding response", http.StatusInternalServerError)
-			return
-		}
+		return c.JSON(countryList)
 	})
 
+	// Get the PORT variable from environment
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8000" // Default port if PORT is not defined in .env
+	}
+
+	// Start the Fiber app
 	fmt.Printf("Server running on port %s...\n", port)
-	http.ListenAndServe(":"+port, nil)
+	log.Fatal(app.Listen(":" + port))
 }
